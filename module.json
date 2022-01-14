@@ -13,7 +13,10 @@
       "patreon": "ElfFriend_DnD"
     }
   ],
-  "system": [ "dnd5e", "sw5e" ],
+  "system": [
+    "dnd5e",
+    "sw5e"
+  ],
   "scripts": [
     "./scripts/module.js"
   ],
@@ -25,6 +28,11 @@
       "lang": "en",
       "name": "English",
       "path": "lang/en.json"
+    },
+    {
+      "lang": "fr",
+      "name": "Français",
+      "path": "lang/fr.json"
     }
   ],
   "dependencies": [

@@ -14,18 +14,26 @@ class AutoRollNpcSave5e {
     this.SOCKET.register('requestTargetSave', this._requestTargetSave);
   }
 
-  static _getStatusIcon = ({ save }) => {
-    if (save) {
-      return '<i class="fas fa-check"></i>';
+  static _getStatusIcon = ({ save, isCriticalSuccess, isCriticalFail }) => {
+    switch (true) {
+      case isCriticalFail:
+        return '<i class="fas fa-thumbs-down"></i>';
+      case isCriticalSuccess:
+        return '<i class="fas fa-check-double"></i>';
+      default:
+        return save ? '<i class="fas fa-check"></i>' : '<i class="fas fa-times"></i>';
     }
-    return '<i class="fas fa-times"></i>';
   }
 
-  static _getStatusLabel = ({ save }) => {
-    if (save) {
-      return game.i18n.localize(`${this.MODULE_NAME}.SAVE`);
+  static _getStatusLabel = ({ save, isCriticalSuccess, isCriticalFail }) => {
+    switch (true) {
+      case isCriticalFail:
+        return game.i18n.localize(`${this.MODULE_NAME}.FUMBLE`);
+      case isCriticalSuccess:
+        return game.i18n.localize(`${this.MODULE_NAME}.CRITICAL`);
+      default:
+        return save ? game.i18n.localize(`${this.MODULE_NAME}.SAVE`) : game.i18n.localize(`${this.MODULE_NAME}.FAIL`);
     }
-    return game.i18n.localize(`${this.MODULE_NAME}.FAIL`);
   }
 
   /**
@@ -75,11 +83,11 @@ class AutoRollNpcSave5e {
   /**
    * Happens on the client machine after it expects targeting to be done.
    * Gets the targeted tokens and requests the GM roll a save for them via socket.
-   * @param {*} item 
-   * @param {*} _chatMessage 
-   * @param {*} _config 
-   * @param {*} _actor 
-   * @returns 
+   * @param {*} item
+   * @param {*} _chatMessage
+   * @param {*} _config
+   * @param {*} _actor
+   * @returns
    */
   static _requestGMRollSave = async (item) => {
     // filters to only tokens without Player owners
@@ -115,27 +123,40 @@ class AutoRollNpcSave5e {
         chatMessage: false,
       });
 
-      const save = saveDc <= roll.total;
+      if (game.modules.get('dice-so-nice')?.active) {
+        game.dice3d.showForRoll(roll);
+      }
+
+      const d20 = roll.dice[0];
+
+      const isCriticalSuccess = (d20.faces === 20) && (d20.values.length === 1) && (d20.total >= (d20.options.critical ?? 20) || roll.total >= saveDc + 10);
+      const isCriticalFail = (d20.faces === 20) && (d20.values.length === 1) && (d20.total === 1 || roll.total <= saveDc - 10);
+
+      const save = !isCriticalFail && (isCriticalSuccess || saveDc <= roll.total);
 
       return {
         token,
         roll,
+        isCriticalSuccess,
+        isCriticalFail,
         save
       }
     }));
 
     const html = `
       <ul class="dnd5e chat-card check-npc-save-list">
-        ${saveResults.map(({ token, roll, save }) => {
-      const statusLabel = this._getStatusLabel({ save });
+        ${saveResults.map(({ token, roll, isCriticalSuccess, isCriticalFail, save }) => {
+      const statusLabel = this._getStatusLabel({ save, isCriticalSuccess, isCriticalFail });
 
-      const statusIcon = this._getStatusIcon({ save });
+      const statusIcon = this._getStatusIcon({ save, isCriticalSuccess, isCriticalFail });
+
+      const resultDelta = roll.total - saveDc > 0 ? `+${roll.total - saveDc}` : roll.total - saveDc;
 
       return `
             <li class="card-header" data-token-id="${token.id}">
               <img class="token-image" src="${token.data.img}" title="${token.data.name}" width="36" height="36" style="transform: rotate(${token.data.rotation ?? 0}deg);">
               <h3>${token.data.name}</h3>
-              <div class="roll-display" title="${roll.formula}">${roll.total}</div>
+              <div class="roll-display" title="${roll.dice[0].total} (${roll.formula})">${resultDelta}</div>
               <div class="status-chip ${save ? 'save' : 'fail'}">
                 <span>${statusLabel}</span>
                 ${statusIcon}
@@ -152,7 +173,7 @@ class AutoRollNpcSave5e {
       user: game.user.data._id,
       flags: { [this.MODULE_NAME]: { isResultCard: true } },
       type: CONST.CHAT_MESSAGE_TYPES.OTHER,
-      speaker: ChatMessage.getSpeaker({actor}),
+      speaker: ChatMessage.getSpeaker({ actor }),
       flavor: game.i18n.localize(`${this.MODULE_NAME}.MESSAGE_HEADER`),
       content: html,
     }
