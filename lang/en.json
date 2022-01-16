@@ -2,6 +2,8 @@
   "auto-roll-npc-save-5e": {
     "MESSAGE_HEADER": "NPC Saving Throw Results",
     "SAVE": "Saves",
-    "FAIL": "Fails"
+    "FAIL": "Fails",
+    "CRITICAL": "Crits",
+    "FUMBLE": "Fumble"
   }
 }
